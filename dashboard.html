@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Sifu | Seguimiento de Descubiertos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+        }
+
+        .metric-value {
+            font-size: 2.25rem;
+            line-height: 2.5rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.025em;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .chart-container {
+            cursor: pointer;
+            transition: border-color 0.15s ease-in-out;
+            appearance: none;
+            color: #475569;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            padding: 0.75rem 1rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .data-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+        }
+
+        .data-table tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-20">
+        <div class="flex items-center gap-4">
+            <img src="logo.png" alt="Grupo Sifu" class="h-12 w-auto object-contain">
+            <div>
+                <h1 class="text-xl font-bold text-slate-800 tracking-tight">GRUPO SIFU</h1>
+                <p class="text-xs text-slate-500 font-medium">Seguimiento de Descubiertos</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-6">
+            <div class="text-right hidden sm:block">
+                <p id="last-updated" class="text-xs font-semibold text-slate-400 uppercase">Actualizado: --</p>
+                <div class="flex items-center justify-end gap-1.5 text-emerald-600 text-xs font-bold mt-0.5">
+                    <span class="relative flex h-2 w-2">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    En línea
+                </div>
+            </div>
+            <button onclick="location.reload()"
+                class="bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 p-2.5 rounded-xl transition shadow-sm hover:text-indigo-600"><i
+                    class="fa-solid fa-sync"></i></button>
+        </div>
+    </header>
+
+    <!-- Filters Toolbar -->
+    <div class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center gap-4 shadow-sm z-10">
+        <label class="text-xs font-bold text-slate-400 uppercase mr-2"><i
+                class="fa-solid fa-filter mr-1.5"></i>Filtros:</label>
+
+        <!-- Date Range -->
+        <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+            <span class="text-xs text-slate-400 font-bold uppercase">Fecha:</span>
+            <input type="date" id="date-start" class="bg-transparent text-xs text-slate-600 focus:outline-none">
+            <span class="text-slate-300">-</span>
+            <input type="date" id="date-end" class="bg-transparent text-xs text-slate-600 focus:outline-none">
+        </div>
+
+        <select id="filter-client"
+            class="filter-select w-40 text-xs text-slate-600 border border-slate-200 rounded p-1">
+            <option value="">Cliente</option>
+            <!-- Dynamic options -->
+        </select>
+
+        <select id="filter-worker"
+            class="filter-select w-40 text-xs text-slate-600 border border-slate-200 rounded p-1">
+            <option value="">Trabajador</option>
+            <!-- Dynamic options -->
+        </select>
+
+        <select id="filter-status"
+            class="filter-select w-32 text-xs text-slate-600 border border-slate-200 rounded p-1">
+            <option value="">Estado</option>
+            <!-- Dynamic options -->
+        </select>
+
+        <select id="filter-type" class="filter-select w-32 text-xs text-slate-600 border border-slate-200 rounded p-1">
+            <option value="">Tipo</option>
+            <!-- Dynamic options -->
+        </select>
+
+        <div class="relative">
+            <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
+            <input type="text" id="searchInput" placeholder="Buscar..."
+                class="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm w-32 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition shadow-sm">
+        </div>
+
+        <button onclick="resetFilters()"
+            class="text-xs font-bold text-slate-400 hover:text-slate-600 transition uppercase ml-2">Reset</button>
+
+        <div class="flex-1"></div>
+
+        <button onclick="exportPDF()"
+            class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 px-4 rounded-lg shadow-lg shadow-rose-200 transition flex items-center gap-2">
+            <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+        </button>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <div class="max-w-8xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+            <!-- KPI Row -->
+            <div class="lg:col-span-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- KPI 1 -->
+                <div class="card p-6 relative overflow-hidden group">
+                    <div class="absolute right-0 top-0 h-full w-1.5 bg-indigo-500"></div>
+                    <div class="relative z-10">
+                        <p class="metric-label">Total Horas</p>
+                        <div class="flex items-baseline gap-2">
+                            <p id="kpi-hours" class="metric-value">0</p>
+                            <span class="text-xs font-medium text-slate-400">h</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1"><i
+                                class="fa-regular fa-clock"></i> Acumulado filtrado</p>
+                    </div>
+                    <i
+                        class="fa-solid fa-chart-line absolute right-6 bottom-6 text-indigo-50 text-6xl group-hover:text-indigo-100 transition-colors pointer-events-none"></i>
+                </div>
+
+                <!-- KPI 2 -->
+                <div class="card p-6 relative overflow-hidden group">
+                    <div class="absolute right-0 top-0 h-full w-1.5 bg-pink-500"></div>
+                    <div class="relative z-10">
+                        <p class="metric-label">Servicios</p>
+                        <p id="kpi-services" class="metric-value">0</p>
+                        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1"><i
+                                class="fa-solid fa-list-check"></i> Registros visibles</p>
+                    </div>
+                    <i
+                        class="fa-solid fa-clipboard-check absolute right-6 bottom-6 text-pink-50 text-6xl group-hover:text-pink-100 transition-colors pointer-events-none"></i>
+                </div>
+
+                <!-- KPI 3 -->
+                <div class="card p-6 relative overflow-hidden group">
+                    <div class="absolute right-0 top-0 h-full w-1.5 bg-amber-500"></div>
+                    <div class="relative z-10">
+                        <p class="metric-label">Clientes Activos</p>
+                        <p id="kpi-clients" class="metric-value">0</p>
+                        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1"><i
+                                class="fa-solid fa-building"></i> En selección actual</p>
+                    </div>
+                    <i
+                        class="fa-solid fa-city absolute right-6 bottom-6 text-amber-50 text-6xl group-hover:text-amber-100 transition-colors pointer-events-none"></i>
+                </div>
+
+                <!-- KPI 4 -->
+                <div class="card p-6 relative overflow-hidden group">
+                    <div class="absolute right-0 top-0 h-full w-1.5 bg-emerald-500"></div>
+                    <div class="relative z-10">
+                        <p class="metric-label">Tasa Cobertura</p>
+                        <p id="kpi-coverage" class="metric-value">0%</p>
+                        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1"><i
+                                class="fa-solid fa-shield-check"></i> Ratio "CUBIERTO"</p>
+                    </div>
+                    <i
+                        class="fa-solid fa-check-double absolute right-6 bottom-6 text-emerald-50 text-6xl group-hover:text-emerald-100 transition-colors pointer-events-none"></i>
+                </div>
+            </div>
+
+            <!-- Charts Row (50/50 Layout) -->
+            <div class="lg:col-span-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Clients Chart -->
+                <div class="card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-slate-800">Horas por Cliente (Top 10)</h3>
+                    </div>
+                    <div class="chart-container h-64">
+                        <canvas id="chartClients"></canvas>
+                    </div>
+                </div>
+
+                <!-- Workers Chart -->
+                <div class="card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-slate-800">Horas por Trabajador (Top 10)</h3>
+                    </div>
+                    <div class="chart-container h-64">
+                        <canvas id="chartWorkers"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="card lg:col-span-4 flex flex-col h-[600px] overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2"><i
+                            class="fa-solid fa-table text-slate-400"></i> Detalle de Registros</h3>
+                    <span id="table-count" class="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md">0
+                        filas</span>
+                </div>
+                <div class="flex-1 overflow-auto bg-white">
+                    <table class="w-full text-left data-table">
+                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold sticky top-0 z-10">
+                            <tr>
+                                <th class="cursor-pointer hover:bg-slate-100 transition p-3"
+                                    onclick="sortTable('fecha')">
+                                    Fecha <i class="fa-solid fa-sort ml-1 text-slate-300"></i>
+                                </th>
+                                <th class="cursor-pointer hover:bg-slate-100 transition p-3"
+                                    onclick="sortTable('cliente')">
+                                    Cliente <i class="fa-solid fa-sort ml-1 text-slate-300"></i>
+                                </th>
+                                <th class="cursor-pointer hover:bg-slate-100 transition p-3"
+                                    onclick="sortTable('tipo')">
+                                    Tipo <i class="fa-solid fa-sort ml-1 text-slate-300"></i>
+                                </th>
+                                <th class="cursor-pointer hover:bg-slate-100 transition p-3"
+                                    onclick="sortTable('trabajador')">
+                                    Trabajador <i class="fa-solid fa-sort ml-1 text-slate-300"></i>
+                                </th>
+                                <th class="p-3">Horario</th>
+                                <th class="cursor-pointer hover:bg-slate-100 transition p-3"
+                                    onclick="sortTable('estado')">
+                                    Estado <i class="fa-solid fa-sort ml-1 text-slate-300"></i>
+                                </th>
+                                <th class="cursor-pointer hover:bg-slate-100 transition p-3 text-right"
+                                    onclick="sortTable('hours')">
+                                    Horas <i class="fa-solid fa-sort ml-1 text-slate-300"></i>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="error-overlay"
+                    class="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center text-center p-6 hidden">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-3xl mb-4"></i>
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">Acceso a Datos Restringido</h2>
+                    <p class="text-slate-500 mb-6">El navegador ha bloqueado el acceso al archivo local
+                        <code>data.json</code>.
+                    </p>
+                    <button onclick="window.location.reload()"
+                        class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-lg transition shadow-lg shadow-rose-200">Reintentar</button>
+                    <p class="text-xs text-slate-400 mt-4">Tip: Usa <code>INICIAR_AUTO_ACTUALIZACION.bat</code></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Fallback Data Loader: Initial Load Only -->
+    <script id="data-loader" src="data.js"
+        onerror="window.dashboardDataLoadError = true; console.error('Error loading data.js');"></script>
+
+    <script>
+        // --- App Logic ---
+        const DATA_URL = 'data.json';
+        let rawData = [];
+        let filteredData = [];
+        let charts = {};
+
+        const filters = {
+            startDate: '',
+            endDate: '',
+            client: '',
+            worker: '',
+            status: '',
+            type: '',
+            search: ''
+        };
+
+        let sortState = {
+            column: 'fecha', // Default sort
+            direction: 'desc' // Default newest first
+        };
+
+        // Initialize
+        async function init() {
+            try {
+                if (window.dashboardDataLoadError) throw new Error("JS Load Error");
+
+                if (window.dashboardData) {
+                    rawData = window.dashboardData;
+                } else {
+                    const response = await fetch(DATA_URL + '?t=' + new Date().getTime());
+                    if (!response.ok) throw new Error("File not found");
+                    rawData = await response.json();
+                }
+
+                if (!rawData || rawData.length === 0) throw new Error("Empty Data");
+
+                updateLastUpdated();
+                document.getElementById('error-overlay').classList.add('hidden');
+
+                // Initial Population
+                populateDropdowns();
+                applyFilters();
+
+                // Event Listeners
+                setupEventListeners();
+
+            } catch (error) {
+                showError(error);
+            }
+        }
+
+        function updateLastUpdated() {
+            document.getElementById('last-updated').textContent = "Actualizado: " + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function setupEventListeners() {
+            // Remove old listeners using cloneNode (simple way to clear events if re-running init, though init runs once)
+            // Here we assume init runs once.
+            document.getElementById('date-start').addEventListener('change', (e) => { filters.startDate = e.target.value; applyFilters(); });
+            document.getElementById('date-end').addEventListener('change', (e) => { filters.endDate = e.target.value; applyFilters(); });
+            document.getElementById('filter-client').addEventListener('change', (e) => { filters.client = e.target.value; applyFilters(); });
+            document.getElementById('filter-worker').addEventListener('change', (e) => { filters.worker = e.target.value; applyFilters(); });
+            document.getElementById('filter-status').addEventListener('change', (e) => { filters.status = e.target.value; applyFilters(); });
+            document.getElementById('filter-type').addEventListener('change', (e) => { filters.type = e.target.value; applyFilters(); });
+
+            // Optimized Search with Debounce
+            document.getElementById('searchInput').addEventListener('input', debounce((e) => {
+                filters.search = e.target.value.toLowerCase();
+                applyFilters();
+            }, 300));
+        }
+
+        function showError(error) {
+            console.error("Init Error:", error);
+            let msg = error.message;
+            if (msg === "Empty Data") msg = "El archivo de datos está vacío.";
+            else if (msg === "File not found") msg = "No se encuentra data.json (local).";
+            else if (msg === "JS Load Error") msg = "Error al cargar data.js (posible bloqueo o sintaxis).";
+
+            const errTitle = document.querySelector('#error-overlay h2');
+            if (errTitle) errTitle.textContent = "Error: " + msg;
+
+            const errDesc = document.querySelector('#error-overlay p');
+            if (errDesc) errDesc.innerHTML = `Detalle: ${error.stack ? error.stack.split('\n')[0] : error}`;
+
+            document.getElementById('error-overlay').classList.remove('hidden');
+        }
+
+
+        // --- Utils ---
+        function debounce(func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function populateDropdowns() {
+            const fill = (id, field) => {
+                const items = [...new Set(rawData.map(r => r[field]).filter(Boolean))].sort();
+                fillSelect(id, items);
+            }
+
+            fill('filter-client', 'cliente');
+            fill('filter-worker', 'trabajador');
+            fill('filter-status', 'estado');
+            fill('filter-type', 'tipo');
+        }
+
+        function fillSelect(id, items) {
+            const select = document.getElementById(id);
+            const current = select.value;
+            // Keep the first option (placeholder)
+            const firstOpt = select.options[0].outerHTML;
+            select.innerHTML = firstOpt;
+
+            items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item;
+                opt.textContent = item;
+                select.appendChild(opt);
+            });
+            if (items.includes(current)) select.value = current;
+            else if (current) select.value = ""; // Reset if option no longer exists
+        }
+
+        function applyFilters() {
+            const term = filters.search;
+
+            filteredData = rawData.filter(r => {
+                // Fail fast checks
+                if (filters.client && r.cliente !== filters.client) return false;
+                if (filters.worker && r.trabajador !== filters.worker) return false;
+                if (filters.status && r.estado !== filters.status) return false;
+                if (filters.type && r.tipo !== filters.type) return false;
+
+                // Date Filtering
+                if (r.fecha) {
+                    if (filters.startDate && r.fecha < filters.startDate) return false;
+                    if (filters.endDate && r.fecha > filters.endDate) return false;
+                }
+
+                // Search
+                if (term) {
+                    const matchSearch = (
+                        (r.cliente && r.cliente.toLowerCase().includes(term)) ||
+                        (r.trabajador && r.trabajador.toLowerCase().includes(term)) ||
+                        (r.estado && r.estado.toLowerCase().includes(term)) ||
+                        (r.tipo && r.tipo.toLowerCase().includes(term))
+                    );
+                    if (!matchSearch) return false;
+                }
+
+                return true;
+            });
+
+            // Apply Sorting
+            if (sortState.column) {
+                filteredData.sort((a, b) => {
+                    let valA = a[sortState.column];
+                    let valB = b[sortState.column];
+
+                    // Handle cleanup / types
+                    if (sortState.column === 'hours') {
+                        valA = parseFloat(valA) || 0;
+                        valB = parseFloat(valB) || 0;
+                    } else {
+                        valA = (valA || '').toString().toLowerCase();
+                        valB = (valB || '').toString().toLowerCase();
+                    }
+
+                    if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+                    if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            renderDashboard();
+            updateSortIcons();
+        }
+
+        function sortTable(column) {
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                sortState.direction = 'asc';
+            }
+            applyFilters();
+        }
+
+        function updateSortIcons() {
+            document.querySelectorAll('th i').forEach(icon => {
+                icon.className = 'fa-solid fa-sort ml-1 text-slate-300';
+            });
+            const activeHeader = document.querySelector(`th[onclick="sortTable('${sortState.column}')"] i`);
+            if (activeHeader) {
+                activeHeader.className = sortState.direction === 'asc'
+                    ? 'fa-solid fa-sort-up ml-1 text-indigo-500'
+                    : 'fa-solid fa-sort-down ml-1 text-indigo-500';
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-client').value = "";
+            document.getElementById('filter-worker').value = "";
+            document.getElementById('filter-status').value = "";
+            document.getElementById('filter-type').value = "";
+            document.getElementById('date-start').value = "";
+            document.getElementById('date-end').value = "";
+            document.getElementById('searchInput').value = "";
+
+            filters.client = ""; filters.worker = ""; filters.status = ""; filters.type = "";
+            filters.startDate = ""; filters.endDate = ""; filters.search = "";
+
+            applyFilters();
+        }
+
+        function renderDashboard() {
+            renderKPIs();
+            renderCharts();
+            renderTable();
+        }
+
+        function renderKPIs() {
+            const totalHours = filteredData.reduce((acc, r) => acc + (parseFloat(r.hours) || 0), 0);
+            const covered = filteredData.filter(r => (r.estado || "").toUpperCase().includes("CUBIERTO")).length;
+            const uniqueClients = new Set(filteredData.map(r => r.cliente)).size;
+
+            animateValue("kpi-hours", totalHours.toFixed(1));
+            animateValue("kpi-services", filteredData.length);
+            animateValue("kpi-clients", uniqueClients);
+            const coverage = filteredData.length ? ((covered / filteredData.length) * 100).toFixed(0) : 0;
+            animateValue("kpi-coverage", coverage + "%");
+        }
+
+        function renderCharts() {
+            Chart.defaults.color = '#64748b';
+            Chart.defaults.borderColor = '#e2e8f0';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+
+            // 1. Clients (Bar)
+            const clientHours = {};
+            filteredData.forEach(r => {
+                const c = r.cliente || "Desconocido";
+                clientHours[c] = (clientHours[c] || 0) + (parseFloat(r.hours) || 0);
+            });
+            const sortedClients = Object.entries(clientHours)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const ctxClients = document.getElementById('chartClients').getContext('2d');
+            if (charts.clients) charts.clients.destroy();
+
+            charts.clients = new Chart(ctxClients, {
+                type: 'bar',
+                data: {
+                    labels: sortedClients.map(x => x[0]),
+                    datasets: [{
+                        label: 'Horas',
+                        data: sortedClients.map(x => x[1]),
+                        backgroundColor: '#6366f1',
+                        hoverBackgroundColor: '#4f46e5',
+                        borderRadius: 6,
+                        barThickness: 'flex',
+                        maxBarThickness: 40
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(1) + 'h';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // 2. Workers (Bar - REPLACING STATUS CHART)
+            const workerHours = {};
+            filteredData.forEach(r => {
+                const w = r.trabajador || "Sin Asignar";
+                workerHours[w] = (workerHours[w] || 0) + (parseFloat(r.hours) || 0);
+            });
+            const sortedWorkers = Object.entries(workerHours)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const ctxWorkers = document.getElementById('chartWorkers').getContext('2d');
+            if (charts.workers) charts.workers.destroy();
+
+            charts.workers = new Chart(ctxWorkers, {
+                type: 'bar',
+                data: {
+                    labels: sortedWorkers.map(x => x[0]),
+                    datasets: [{
+                        label: 'Horas',
+                        data: sortedWorkers.map(x => x[1]),
+                        backgroundColor: '#10b981', // Emerald-500
+                        hoverBackgroundColor: '#059669',
+                        borderRadius: 6,
+                        barThickness: 'flex',
+                        maxBarThickness: 40
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // Horizontal Bar for better name readability
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.parsed.x.toFixed(1) + 'h';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            document.getElementById('table-count').innerText = filteredData.length + " filas";
+            const displayData = filteredData.slice(0, 500);
+
+            tbody.innerHTML = displayData.map(r => `
+                <tr class="transition border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                    <td class="p-3 text-slate-500 font-medium text-xs whitespace-nowrap">${r.fecha || '-'}</td>
+                    <td class="p-3 font-semibold text-slate-700">${r.cliente}</td>
+                    <td class="p-3 text-slate-500 text-sm">${r.tipo || '-'}</td>
+                    <td class="p-3 text-slate-600 font-medium text-sm flex items-center">
+                        <div class="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-xs mr-2"><i class="fa-solid fa-user"></i></div>
+                        ${r.trabajador || ''}
+                    </td>
+                    <td class="p-3 text-slate-500 text-sm whitespace-nowrap">${(r.horIn && r.horFin) ? (r.horIn + ' - ' + r.horFin) : '-'}</td>
+                    <td class="p-3">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusClasses(r.estado)}">
+                            ${getStatusIcon(r.estado)} ${r.estado}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right font-bold text-slate-800">${(r.hours || 0).toFixed(1)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function getStatusClasses(status) {
+            if (!status) return 'bg-slate-100 text-slate-500';
+            status = status.toUpperCase();
+            if (status.includes('CUBIERTO')) return 'bg-emerald-100 text-emerald-700';
+            if (status.includes('PENDIENTE')) return 'bg-amber-100 text-amber-700';
+            if (status.includes('VACACIONES')) return 'bg-blue-100 text-blue-700';
+            if (status.includes('BAJA')) return 'bg-rose-100 text-rose-700';
+            if (status.includes('DESCUBIERTO')) return 'bg-red-100 text-red-700 border border-red-200';
+            return 'bg-slate-100 text-slate-600';
+        }
+
+        function getStatusIcon(status) {
+            if (!status) return '';
+            status = status.toUpperCase();
+            if (status.includes('CUBIERTO')) return '<i class="fa-solid fa-check mr-1.5"></i>';
+            if (status.includes('VACACIONES')) return '<i class="fa-solid fa-plane mr-1.5"></i>';
+            if (status.includes('BAJA')) return '<i class="fa-solid fa-user-doctor mr-1.5"></i>';
+            if (status.includes('DESCUBIERTO')) return '<i class="fa-solid fa-triangle-exclamation mr-1.5"></i>';
+            return '';
+        }
+
+        function animateValue(id, value) {
+            const obj = document.getElementById(id);
+            if (obj) obj.innerHTML = value;
+        }
+
+        // --- PDF Export Logic ---
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4'); // Landscape, A4
+
+            // Header
+            doc.setFontSize(18);
+            doc.text("Reporte de Servicios", 14, 22);
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 28);
+
+            // Filter Summary
+            let filterText = [];
+            if (filters.client) filterText.push(`Cliente: ${filters.client}`);
+            if (filters.worker) filterText.push(`Trabajador: ${filters.worker}`);
+            if (filters.status) filterText.push(`Estado: ${filters.status}`);
+            if (filters.type) filterText.push(`Tipo: ${filters.type}`);
+
+            if (filterText.length > 0) {
+                doc.text(`Filtros: ${filterText.join(', ')}`, 14, 34);
+            }
+
+            // Table Data
+            const tableRows = filteredData.map(r => [
+                r.fecha || '',
+                r.cliente || '',
+                r.tipo || '',
+                r.trabajador || '',
+                `${r.horIn || ''} - ${r.horFin || ''}`, // Horario
+                r.estado || '',
+                (r.hours || 0).toFixed(1)
+            ]);
+
+            doc.autoTable({
+                head: [['Fecha', 'Cliente', 'Proyecto / Tipo', 'Trabajador', 'Horario', 'Estado', 'Horas']],
+                body: tableRows,
+                startY: filterText.length > 0 ? 40 : 32,
+                theme: 'striped',
+                headStyles: { fillColor: [79, 70, 229] }, // Indigo-600
+                styles: { fontSize: 8, cellPadding: 3 },
+                columnStyles: {
+                    0: { cellWidth: 25 }, // Fecha
+                    2: { cellWidth: 35 }, // Tipo
+                    4: { cellWidth: 25 }, // Horario
+                    6: { cellWidth: 20, halign: 'right' } // Horas
+                }
+            });
+
+            doc.save(`reporte_servicios_${new Date().toISOString().slice(0, 10)}.pdf`);
+        }
+
+        // --- Silent Auto-Reload Logic ---
+        // Re-injects data.js without refreshing the page
+        setInterval(() => {
+            // Prevent reload if user is interacting with filters or search
+            if (filters.search || filters.client || filters.worker || filters.type || filters.startDate) {
+                return;
+            }
+
+            const oldScript = document.getElementById('data-loader');
+            if (oldScript) oldScript.remove();
+
+            const newScript = document.createElement('script');
+            newScript.id = 'data-loader';
+            newScript.src = 'data.js?t=' + new Date().getTime(); // Bust cache
+
+            newScript.onload = () => {
+                if (window.dashboardData) {
+                    // Only update if data changed (naive check, or just force update)
+                    rawData = window.dashboardData;
+                    populateDropdowns(); // Refresh dropdowns (optional)
+                    applyFilters(); // Re-render charts/tables
+                    updateLastUpdated();
+                }
+            };
+
+            newScript.onerror = () => {
+                console.warn("Silent update failed to load data.js");
+            };
+
+            document.body.appendChild(newScript);
+
+        }, 5000);
+
+        // Start
+        init();
+    </script>
+</body>
+
+</html>
