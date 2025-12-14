@@ -18,7 +18,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 
     <style>
-        body {
+        body 
+        <script>
+  const password = "SIFU2025";  // 🔑 CAMBIA ESTA CONTRASEÑA
+
+  const userPassword = prompt("Introduce la contraseña para acceder:");
+
+  if (userPassword !== password) {
+    document.body.innerHTML = "<h2>Acceso denegado</h2>";
+    throw new Error("Acceso denegado");
+  }
+</script> 
+            {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
         }
@@ -813,3 +824,4 @@
 </body>
 
 </html>
+
