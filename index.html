@@ -99,7 +99,17 @@
 </head>
 
 <body class="h-screen flex flex-col overflow-hidden">
+<script>
+  const password = "ALEXSIFU25";
 
+  const userPassword = prompt("Introduce la contraseña para acceder:");
+
+  if (userPassword !== password) {
+    document.body.innerHTML = "<h2>Acceso denegado</h2>";
+    throw new Error("Acceso denegado");
+  }
+</script>
+    
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-20">
         <div class="flex items-center gap-4">
@@ -813,5 +823,6 @@
 </body>
 
 </html>
+
 
 
